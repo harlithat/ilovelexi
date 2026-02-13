@@ -6,7 +6,6 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // 160x160 sheet, 4x4 grid, 40x40 frames
     this.load.spritesheet("heart", "/assets/heart.png", {
       frameWidth: 40,
       frameHeight: 40
@@ -14,6 +13,76 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.showIntroScreen()
+  }
+
+  // =========================
+  // INTRO SCREEN
+  // =========================
+
+  showIntroScreen() {
+    const width = this.scale.width
+    const height = this.scale.height
+
+    this.createBackground()
+
+    const introText = `B”H
+
+To my gorgeous Lexi,
+
+In honor of our 15th Anniversary, I have done what any normal, well-adjusted husband would do: I built you a game that now lives permanently in cyberspace to publicly (and competitively) declare my love.
+
+See how many hearts you can tap. My record is 56.
+
+With endless love from your adoring and nerdy (but cool) husband`
+
+    this.add.text(width / 2, height / 2 - 40, introText, {
+      fontSize: "18px",
+      color: "#ffffff",
+      fontFamily: "Arial",
+      align: "center",
+      wordWrap: { width: width - 60 }
+    }).setOrigin(0.5)
+
+    const startText = this.add.text(width / 2, height - 120, "Tap to Begin ❤️", {
+      fontSize: "22px",
+      color: "#ff8080",
+      fontStyle: "bold"
+    }).setOrigin(0.5)
+
+    // Gentle pulse on start text
+    this.tweens.add({
+      targets: startText,
+      scale: 1.08,
+      yoyo: true,
+      repeat: -1,
+      duration: 800,
+      ease: "Sine.easeInOut"
+    })
+
+    this.input.once("pointerdown", () => {
+      this.startGame()
+    })
+  }
+
+  // =========================
+  // GAME INITIALIZATION
+  // =========================
+
+  startGame() {
+    this.scene.restart({ started: true })
+  }
+
+  init(data) {
+    this.started = data.started || false
+  }
+
+  create(data) {
+    if (!this.started) {
+      this.showIntroScreen()
+      return
+    }
+
     this.score = 0
     this.timeLeft = 30
     this.wave = 1
@@ -38,12 +107,11 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(1, 0)
 
     this.ruleText = this.add.text(width / 2, 90, "TAP ALL HEARTS", {
-      fontSize: "24px",
+      fontSize: "22px",
       color: "#ffffff",
       fontStyle: "bold"
     }).setOrigin(0.5)
 
-    // Create heart animation (16 frames: 0–15)
     this.anims.create({
       key: "heartPulse",
       frames: this.anims.generateFrameNumbers("heart", {
@@ -126,16 +194,12 @@ class GameScene extends Phaser.Scene {
     }
 
     const heart = this.add.sprite(x, y, "heart", 0)
-
-    // 40px is small — scale up for visibility
     heart.setScale(2.2)
     heart.setOrigin(0.5)
 
     heart.setInteractive({ useHandCursor: true })
-
     heart.on("pointerdown", () => this.handleTap(heart))
 
-    // Spawn pop animation
     heart.scale = 0
     this.tweens.add({
       targets: heart,
@@ -194,14 +258,7 @@ class GameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
-    const overlay = this.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0x000000,
-      0.85
-    )
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85)
 
     this.add.text(width / 2, height / 2 - 40, "GAME OVER", {
       fontSize: "38px",
@@ -214,7 +271,7 @@ class GameScene extends Phaser.Scene {
       color: "#ffffff"
     }).setOrigin(0.5)
 
-    this.add.text(width / 2, height / 2 + 60, "Tap to Restart", {
+    this.add.text(width / 2, height / 2 + 60, "Tap to Play Again", {
       fontSize: "20px",
       color: "#aaaaaa"
     }).setOrigin(0.5)
@@ -229,8 +286,8 @@ class GameScene extends Phaser.Scene {
 const config = {
   type: Phaser.AUTO,
   backgroundColor: "#000000",
-  pixelArt: true,     // prevents frame bleeding
-  roundPixels: true,  // keeps rendering crisp
+  pixelArt: true,
+  roundPixels: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
