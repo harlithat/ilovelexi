@@ -1,245 +1,246 @@
 import Phaser from "phaser"
 
-const shapes = ["circle", "square", "triangle"]
-
 class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene")
   }
 
   create() {
-    this.lives = 3
     this.score = 0
-    this.combo = 0
-    this.multiplier = 1
-    this.spawnDelay = 1000
-    this.waveDuration = 10000
-    this.startTime = this.time.now
-    this.fallBaseSpeed = 180
+    this.timeLeft = 30
+    this.wave = 1
+    this.squareCount = 0
+    this.shapes = []
+    this.gameEnded = false
 
-    this.scoreText = this.add.text(20, 20, "Score: 0", {
-      fontSize: "22px",
-      color: "#ffffff"
+    this.createBackground()
+
+    const width = this.scale.width
+
+    this.scoreText = this.add.text(20, 20, "0", {
+      fontSize: "32px",
+      color: "#ffffff",
+      fontFamily: "Arial"
     })
 
-    this.comboText = this.add.text(20, 50, "Combo: x1", {
-      fontSize: "22px",
-      color: "#00ffcc"
-    })
+    this.timerText = this.add.text(width - 20, 20, "30", {
+      fontSize: "32px",
+      color: "#ffffff",
+      fontFamily: "Arial"
+    }).setOrigin(1, 0)
 
-    this.livesText = this.add.text(650, 20, "Lives: ♥♥♥", {
-      fontSize: "22px",
-      color: "#ffffff"
-    })
-
-    this.targetLabel = this.add.text(400, 60, "Tap This Shape:", {
+    this.ruleText = this.add.text(width / 2, 90, "TAP ALL SQUARES", {
       fontSize: "24px",
-      color: "#ffffff"
+      color: "#ffffff",
+      fontStyle: "bold"
     }).setOrigin(0.5)
 
-    this.targetShape = Phaser.Utils.Array.GetRandom(shapes)
-    this.drawTargetIcon(true)
-
-    this.fallingShapes = []
-
-    this.spawnTimer = this.time.addEvent({
-      delay: this.spawnDelay,
-      callback: this.spawnShape,
-      callbackScope: this,
-      loop: true
-    })
-
-    this.waveTimer = this.time.addEvent({
-      delay: this.waveDuration,
-      callback: this.changeWave,
-      callbackScope: this,
-      loop: true
-    })
+    this.startCountdown()
+    this.spawnWave()
   }
 
-  update(time, delta) {
-    const elapsed = this.time.now - this.startTime
+  createBackground() {
+    const width = this.scale.width
+    const height = this.scale.height
 
-    if (elapsed > 15000) this.spawnTimer.delay = 800
-    if (elapsed > 30000) this.spawnTimer.delay = 600
-    if (elapsed > 45000) this.spawnTimer.delay = 450
+    const bg = this.add.graphics()
+    bg.fillGradientStyle(0x1e1e2f, 0x1e1e2f, 0x121220, 0x121220, 1)
+    bg.fillRect(0, 0, width, height)
+  }
 
-    for (let i = this.fallingShapes.length - 1; i >= 0; i--) {
-      const obj = this.fallingShapes[i]
+  startCountdown() {
+    this.timerEvent = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        if (this.gameEnded) return
 
-      obj.speed += 20 * (delta / 1000)
-      obj.y += obj.speed * (delta / 1000)
+        this.timeLeft--
+        this.timerText.setText(this.timeLeft)
 
-      if (obj.y > 650) {
-        if (obj.shapeType === this.targetShape) {
-          this.resetCombo()
-          this.loseLife()
+        if (this.timeLeft <= 0) {
+          this.endGame()
         }
-        obj.destroy()
-        this.fallingShapes.splice(i, 1)
       }
-    }
+    })
   }
 
-  spawnShape() {
-    const shapeType = Phaser.Utils.Array.GetRandom(shapes)
-    const x = Phaser.Math.Between(100, 700)
+  spawnWave() {
+    this.clearShapes()
+    this.squareCount = 0
 
-    const graphics = this.add.graphics()
-    graphics.fillStyle(Phaser.Display.Color.RandomRGB().color)
+    let totalShapes = 8 + this.wave * 3
+    let availableShapes = ["square"]
 
-    if (shapeType === "circle") graphics.fillCircle(0, 0, 30)
-    if (shapeType === "square") graphics.fillRect(-30, -30, 60, 60)
-    if (shapeType === "triangle") graphics.fillTriangle(0, -35, -35, 35, 35, 35)
+    if (this.wave >= 2) availableShapes.push("triangle")
+    if (this.wave >= 3) availableShapes.push("circle")
 
-    const container = this.add.container(x, -50, [graphics])
-    container.shapeType = shapeType
-    container.speed = this.fallBaseSpeed
+    for (let i = 0; i < totalShapes; i++) {
+      const type = Phaser.Utils.Array.GetRandom(availableShapes)
+      this.spawnShape(type)
+    }
 
-    container.setSize(70, 70)
-    container.setInteractive(
-      new Phaser.Geom.Rectangle(-35, -35, 70, 70),
-      Phaser.Geom.Rectangle.Contains
-    )
+    this.wave++
+  }
+
+  spawnShape(type) {
+    const width = this.scale.width
+    const height = this.scale.height
+
+    const size = 26
+    const padding = 22
+    const maxAttempts = 80
+
+    let x, y
+    let valid = false
+    let attempts = 0
+
+    while (!valid && attempts < maxAttempts) {
+      x = Phaser.Math.Between(50, width - 50)
+      y = Phaser.Math.Between(150, height - 50)
+
+      valid = true
+
+      for (let existing of this.shapes) {
+        const dist = Phaser.Math.Distance.Between(x, y, existing.x, existing.y)
+        if (dist < size + padding) {
+          valid = false
+          break
+        }
+      }
+
+      attempts++
+    }
+
+    const container = this.add.container(x, y)
+    const graphic = this.add.graphics()
+
+    if (type === "square") {
+      graphic.fillStyle(0x4da6ff)
+      graphic.fillRoundedRect(-size/2, -size/2, size, size, 6)
+      this.squareCount++
+    }
+
+    if (type === "triangle") {
+      graphic.fillStyle(0xff6b6b)
+      graphic.fillTriangle(0, -size/2, -size/2, size/2, size/2, size/2)
+    }
+
+    if (type === "circle") {
+      graphic.fillStyle(0x4dffb8)
+      graphic.fillCircle(0, 0, size/2)
+    }
+
+    container.add(graphic)
+
+    // Generous hitbox
+    container.setSize(size + 20, size + 20)
+    container.setInteractive()
+
+    container.shapeType = type
 
     container.on("pointerdown", () => {
       this.handleTap(container)
     })
 
-    this.fallingShapes.push(container)
+    // Spawn animation
+    container.scale = 0
+    this.tweens.add({
+      targets: container,
+      scale: 1,
+      duration: 250,
+      ease: "Back.Out"
+    })
+
+    this.shapes.push(container)
   }
 
   handleTap(shape) {
-    if (shape.shapeType === this.targetShape) {
-      this.combo++
-      if (this.combo % 5 === 0) {
-        this.multiplier += 0.5
-        this.showPerfect()
+    if (this.gameEnded) return
+
+    if (shape.shapeType === "square") {
+      this.score++
+      this.scoreText.setText(this.score)
+
+      this.squareCount--
+
+      this.tweens.add({
+        targets: shape,
+        scale: 0,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => shape.destroy()
+      })
+
+      this.shapes = this.shapes.filter(s => s !== shape)
+
+      if (this.squareCount === 0) {
+        this.spawnWave()
       }
 
-      this.score += 1 * this.multiplier
     } else {
-      this.resetCombo()
-      this.loseLife()
-    }
-
-    shape.destroy()
-    this.fallingShapes = this.fallingShapes.filter(s => s !== shape)
-
-    this.updateUI()
-  }
-
-  resetCombo() {
-    this.combo = 0
-    this.multiplier = 1
-  }
-
-  changeWave() {
-    this.targetShape = Phaser.Utils.Array.GetRandom(shapes)
-
-    // Slow motion effect
-    this.time.timeScale = 0.5
-
-    this.time.delayedCall(600, () => {
-      this.time.timeScale = 1
-    })
-
-    this.drawTargetIcon(true)
-  }
-
-  drawTargetIcon(flash = false) {
-    if (this.targetGraphic) this.targetGraphic.destroy()
-
-    this.targetGraphic = this.add.graphics()
-    this.targetGraphic.fillStyle(0xffff00)
-
-    const x = 400
-    const y = 120
-
-    if (this.targetShape === "circle")
-      this.targetGraphic.fillCircle(x, y, 30)
-
-    if (this.targetShape === "square")
-      this.targetGraphic.fillRect(x - 30, y - 30, 60, 60)
-
-    if (this.targetShape === "triangle")
-      this.targetGraphic.fillTriangle(x, y - 35, x - 35, y + 35, x + 35, y + 35)
-
-    if (flash) {
-      this.tweens.add({
-        targets: this.targetGraphic,
-        alpha: 0,
-        duration: 150,
-        yoyo: true,
-        repeat: 3
-      })
+      this.endGame()
     }
   }
 
-  showPerfect() {
-    const text = this.add.text(400, 300, "PERFECT!", {
-      fontSize: "42px",
-      color: "#00ffcc",
+  clearShapes() {
+    for (let shape of this.shapes) {
+      shape.destroy()
+    }
+    this.shapes = []
+  }
+
+  endGame() {
+    if (this.gameEnded) return
+    this.gameEnded = true
+
+    this.timerEvent.remove(false)
+    this.clearShapes()
+
+    const width = this.scale.width
+    const height = this.scale.height
+
+    const overlay = this.add.rectangle(
+      width / 2,
+      height / 2,
+      width,
+      height,
+      0x000000,
+      0.85
+    )
+
+    this.add.text(width / 2, height / 2 - 40, "GAME OVER", {
+      fontSize: "38px",
+      color: "#ffffff",
       fontStyle: "bold"
     }).setOrigin(0.5)
 
-    this.tweens.add({
-      targets: text,
-      y: 250,
-      alpha: 0,
-      duration: 800,
-      onComplete: () => text.destroy()
-    })
-  }
-
-  loseLife() {
-    this.lives--
-    this.updateUI()
-
-    if (this.lives <= 0) {
-      this.gameOver()
-    }
-  }
-
-  gameOver() {
-    this.spawnTimer.remove(false)
-    this.waveTimer.remove(false)
-
-    this.add.rectangle(400, 300, 800, 600, 0x000000, 0.8)
-
-    this.add.text(400, 250, "GAME OVER", {
-      fontSize: "48px",
-      color: "#ff4444",
-      fontStyle: "bold"
-    }).setOrigin(0.5)
-
-    this.add.text(400, 320, "Final Score: " + Math.floor(this.score), {
-      fontSize: "28px",
+    this.add.text(width / 2, height / 2 + 10, `Score: ${this.score}`, {
+      fontSize: "26px",
       color: "#ffffff"
     }).setOrigin(0.5)
 
-    this.add.text(400, 380, "Click to Restart", {
-      fontSize: "22px",
-      color: "#00ffcc"
+    this.add.text(width / 2, height / 2 + 60, "Tap to Restart", {
+      fontSize: "20px",
+      color: "#aaaaaa"
     }).setOrigin(0.5)
 
-    this.input.once("pointerdown", () => {
+    overlay.setInteractive()
+    overlay.once("pointerdown", () => {
       this.scene.restart()
     })
-  }
-
-  updateUI() {
-    this.scoreText.setText("Score: " + Math.floor(this.score))
-    this.comboText.setText("Combo: x" + this.multiplier)
-    this.livesText.setText("Lives: " + "♥".repeat(this.lives))
   }
 }
 
 const config = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  backgroundColor: "#1a1a1a",
+  backgroundColor: "#000000",
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 390,
+    height: 844
+  },
   scene: GameScene
 }
 
