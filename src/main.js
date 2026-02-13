@@ -6,11 +6,8 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // 🔥 LOAD HEART SPRITE SHEET
-    this.load.spritesheet("heart", "/assets/heart.png", {
-      frameWidth: 200,
-      frameHeight: 200
-    })
+    // Load the heart sheet as a single image (NOT a spritesheet grid)
+    this.load.image("heartSheet", "/assets/heart.png")
   }
 
   create() {
@@ -43,19 +40,59 @@ class GameScene extends Phaser.Scene {
       fontStyle: "bold"
     }).setOrigin(0.5)
 
-    // 🎬 CREATE HEART ANIMATION
+    // Build frames from the PNG (manually cropped rectangles)
+    this.defineHeartFrames()
+
+    // Create animation from those frames
     this.anims.create({
       key: "heartPulse",
-      frames: this.anims.generateFrameNumbers("heart", {
-        start: 0,
-        end: 19
-      }),
+      frames: Array.from({ length: 18 }, (_, i) => ({ key: "heartSheet", frame: `heart_${i}` })),
       frameRate: 24,
       repeat: 0
     })
 
     this.startCountdown()
     this.spawnWave()
+  }
+
+  defineHeartFrames() {
+    const tex = this.textures.get("heartSheet")
+
+    // IMPORTANT:
+    // These rectangles match YOUR uploaded PNG layout (1024x1024) which is NOT a uniform grid.
+    // Format: [x, y, w, h]
+    const frames = [
+      // Row 1 (5 hearts, left -> right)
+      [43, 102, 113, 96],
+      [181, 93, 136, 115],
+      [338, 75, 173, 147],
+      [528, 62, 205, 170],
+      [764, 51, 222, 188],
+
+      // Row 2 (4 hearts, left -> right)
+      [19, 306, 223, 192],
+      [264, 299, 281, 229],
+      [571, 304, 251, 209],
+      [815, 303, 209, 186],
+
+      // Row 3 (4 hearts, left -> right)
+      [29, 541, 264, 233],
+      [329, 548, 265, 223],
+      [612, 548, 265, 221],
+      [827, 548, 213, 205],
+
+      // Row 4 (5 hearts, left -> right)
+      [75, 868, 99, 88],
+      [295, 865, 109, 95],
+      [495, 865, 109, 96],
+      [675, 865, 107, 96],
+      [843, 865, 109, 97]
+    ]
+
+    for (let i = 0; i < frames.length; i++) {
+      const [x, y, w, h] = frames[i]
+      tex.add(`heart_${i}`, 0, x, y, w, h)
+    }
   }
 
   createBackground() {
@@ -88,9 +125,9 @@ class GameScene extends Phaser.Scene {
     this.clearShapes()
     this.heartCount = 0
 
-    let totalShapes = 8 + this.wave * 3
+    const totalHearts = 8 + this.wave * 3
 
-    for (let i = 0; i < totalShapes; i++) {
+    for (let i = 0; i < totalHearts; i++) {
       this.spawnHeart()
     }
 
@@ -101,8 +138,9 @@ class GameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
-    const size = 70
-    const padding = 60
+    // Use bigger spacing because hearts can animate larger
+    const size = 60
+    const padding = 70
     const maxAttempts = 80
 
     let x, y
@@ -126,21 +164,24 @@ class GameScene extends Phaser.Scene {
       attempts++
     }
 
-    const heart = this.add.sprite(x, y, "heart", 0)
-    heart.setScale(0.35)
+    const heart = this.add.sprite(x, y, "heartSheet", "heart_0")
+    heart.setOrigin(0.5)
 
-    heart.setInteractive()
+    // scale to suit your game; tweak if needed
+    heart.setScale(0.55)
+
+    // generous hit area (independent of frame crop)
+    heart.setInteractive(new Phaser.Geom.Circle(0, 0, 60), Phaser.Geom.Circle.Contains)
+
     heart.shapeType = "heart"
 
-    heart.on("pointerdown", () => {
-      this.handleTap(heart)
-    })
+    heart.on("pointerdown", () => this.handleTap(heart))
 
-    // Spawn pop animation
+    // Spawn pop
     heart.scale = 0
     this.tweens.add({
       targets: heart,
-      scale: 0.35,
+      scale: 0.55,
       duration: 250,
       ease: "Back.Out"
     })
@@ -152,12 +193,14 @@ class GameScene extends Phaser.Scene {
   handleTap(heart) {
     if (this.gameEnded) return
 
+    // prevent double taps while animating
+    heart.disableInteractive()
+
     this.score++
     this.scoreText.setText(this.score)
 
     this.heartCount--
 
-    // ▶️ Play sprite sheet animation
     heart.play("heartPulse")
 
     heart.once("animationcomplete", () => {
@@ -194,14 +237,7 @@ class GameScene extends Phaser.Scene {
     const width = this.scale.width
     const height = this.scale.height
 
-    const overlay = this.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0x000000,
-      0.85
-    )
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.85)
 
     this.add.text(width / 2, height / 2 - 40, "GAME OVER", {
       fontSize: "38px",
