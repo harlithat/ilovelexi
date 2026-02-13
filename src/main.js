@@ -5,11 +5,19 @@ class GameScene extends Phaser.Scene {
     super("GameScene")
   }
 
+  preload() {
+    // 🔥 LOAD HEART SPRITE SHEET
+    this.load.spritesheet("heart", "/assets/heart.png", {
+      frameWidth: 200,
+      frameHeight: 200
+    })
+  }
+
   create() {
     this.score = 0
     this.timeLeft = 30
     this.wave = 1
-    this.squareCount = 0
+    this.heartCount = 0
     this.shapes = []
     this.gameEnded = false
 
@@ -29,11 +37,22 @@ class GameScene extends Phaser.Scene {
       fontFamily: "Arial"
     }).setOrigin(1, 0)
 
-    this.ruleText = this.add.text(width / 2, 90, "TAP ALL SQUARES", {
+    this.ruleText = this.add.text(width / 2, 90, "TAP ALL HEARTS", {
       fontSize: "24px",
       color: "#ffffff",
       fontStyle: "bold"
     }).setOrigin(0.5)
+
+    // 🎬 CREATE HEART ANIMATION
+    this.anims.create({
+      key: "heartPulse",
+      frames: this.anims.generateFrameNumbers("heart", {
+        start: 0,
+        end: 19
+      }),
+      frameRate: 24,
+      repeat: 0
+    })
 
     this.startCountdown()
     this.spawnWave()
@@ -67,28 +86,23 @@ class GameScene extends Phaser.Scene {
 
   spawnWave() {
     this.clearShapes()
-    this.squareCount = 0
+    this.heartCount = 0
 
     let totalShapes = 8 + this.wave * 3
-    let availableShapes = ["square"]
-
-    if (this.wave >= 2) availableShapes.push("triangle")
-    if (this.wave >= 3) availableShapes.push("circle")
 
     for (let i = 0; i < totalShapes; i++) {
-      const type = Phaser.Utils.Array.GetRandom(availableShapes)
-      this.spawnShape(type)
+      this.spawnHeart()
     }
 
     this.wave++
   }
 
-  spawnShape(type) {
+  spawnHeart() {
     const width = this.scale.width
     const height = this.scale.height
 
-    const size = 26
-    const padding = 22
+    const size = 70
+    const padding = 60
     const maxAttempts = 80
 
     let x, y
@@ -96,8 +110,8 @@ class GameScene extends Phaser.Scene {
     let attempts = 0
 
     while (!valid && attempts < maxAttempts) {
-      x = Phaser.Math.Between(50, width - 50)
-      y = Phaser.Math.Between(150, height - 50)
+      x = Phaser.Math.Between(60, width - 60)
+      y = Phaser.Math.Between(150, height - 60)
 
       valid = true
 
@@ -112,74 +126,54 @@ class GameScene extends Phaser.Scene {
       attempts++
     }
 
-    const container = this.add.container(x, y)
-    const graphic = this.add.graphics()
+    const heart = this.add.sprite(x, y, "heart", 0)
+    heart.setScale(0.35)
 
-    if (type === "square") {
-      graphic.fillStyle(0x4da6ff)
-      graphic.fillRoundedRect(-size/2, -size/2, size, size, 6)
-      this.squareCount++
-    }
+    heart.setInteractive()
+    heart.shapeType = "heart"
 
-    if (type === "triangle") {
-      graphic.fillStyle(0xff6b6b)
-      graphic.fillTriangle(0, -size/2, -size/2, size/2, size/2, size/2)
-    }
-
-    if (type === "circle") {
-      graphic.fillStyle(0x4dffb8)
-      graphic.fillCircle(0, 0, size/2)
-    }
-
-    container.add(graphic)
-
-    // Generous hitbox
-    container.setSize(size + 20, size + 20)
-    container.setInteractive()
-
-    container.shapeType = type
-
-    container.on("pointerdown", () => {
-      this.handleTap(container)
+    heart.on("pointerdown", () => {
+      this.handleTap(heart)
     })
 
-    // Spawn animation
-    container.scale = 0
+    // Spawn pop animation
+    heart.scale = 0
     this.tweens.add({
-      targets: container,
-      scale: 1,
+      targets: heart,
+      scale: 0.35,
       duration: 250,
       ease: "Back.Out"
     })
 
-    this.shapes.push(container)
+    this.shapes.push(heart)
+    this.heartCount++
   }
 
-  handleTap(shape) {
+  handleTap(heart) {
     if (this.gameEnded) return
 
-    if (shape.shapeType === "square") {
-      this.score++
-      this.scoreText.setText(this.score)
+    this.score++
+    this.scoreText.setText(this.score)
 
-      this.squareCount--
+    this.heartCount--
 
+    // ▶️ Play sprite sheet animation
+    heart.play("heartPulse")
+
+    heart.once("animationcomplete", () => {
       this.tweens.add({
-        targets: shape,
+        targets: heart,
         scale: 0,
         alpha: 0,
         duration: 200,
-        onComplete: () => shape.destroy()
+        onComplete: () => heart.destroy()
       })
+    })
 
-      this.shapes = this.shapes.filter(s => s !== shape)
+    this.shapes = this.shapes.filter(s => s !== heart)
 
-      if (this.squareCount === 0) {
-        this.spawnWave()
-      }
-
-    } else {
-      this.endGame()
+    if (this.heartCount === 0) {
+      this.spawnWave()
     }
   }
 
