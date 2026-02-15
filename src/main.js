@@ -10,75 +10,20 @@ class GameScene extends Phaser.Scene {
       frameWidth: 40,
       frameHeight: 40
     })
+
+    this.load.spritesheet("banana", "/assets/banana.png", {
+      frameWidth: 55,
+      frameHeight: 123
+    })
+
     this.load.audio("pop", "/assets/bubblepop.mp3")
-  }
-
-  create() {
-    this.showIntroScreen()
-  }
-
-  // =========================
-  // INTRO SCREEN
-  // =========================
-
-  showIntroScreen() {
-    const width = this.scale.width
-    const height = this.scale.height
-
-    this.createBackground()
-
-    const introText = `B”H
-
-To my gorgeous Lexi,
-
-In honor of our 15th Anniversary, I have done what any normal, well-adjusted husband would do: I built you a game that now lives permanently in cyberspace to publicly (and competitively) declare my love.
-
-See how many hearts you can tap. My record is 56.
-
-With endless love from your adoring and nerdy (but cool) husband`
-
-    this.add.text(width / 2, height / 2 - 40, introText, {
-      fontSize: "18px",
-      color: "#ffffff",
-      fontFamily: "Arial",
-      align: "center",
-      wordWrap: { width: width - 60 }
-    }).setOrigin(0.5)
-
-    const startText = this.add.text(width / 2, height - 120, "Tap to Begin ❤️", {
-      fontSize: "22px",
-      color: "#ff8080",
-      fontStyle: "bold"
-    }).setOrigin(0.5)
-
-    // Gentle pulse on start text
-    this.tweens.add({
-      targets: startText,
-      scale: 1.08,
-      yoyo: true,
-      repeat: -1,
-      duration: 800,
-      ease: "Sine.easeInOut"
-    })
-
-    this.input.once("pointerdown", () => {
-      this.startGame()
-    })
-  }
-
-  // =========================
-  // GAME INITIALIZATION
-  // =========================
-
-  startGame() {
-    this.scene.restart({ started: true })
   }
 
   init(data) {
     this.started = data.started || false
   }
 
-  create(data) {
+  create() {
     if (!this.started) {
       this.showIntroScreen()
       return
@@ -90,6 +35,7 @@ With endless love from your adoring and nerdy (but cool) husband`
     this.heartCount = 0
     this.shapes = []
     this.gameEnded = false
+    this.banana = null
 
     this.createBackground()
 
@@ -113,6 +59,8 @@ With endless love from your adoring and nerdy (but cool) husband`
       fontStyle: "bold"
     }).setOrigin(0.5)
 
+    this.popSound = this.sound.add("pop")
+
     this.anims.create({
       key: "heartPulse",
       frames: this.anims.generateFrameNumbers("heart", {
@@ -123,8 +71,67 @@ With endless love from your adoring and nerdy (but cool) husband`
       repeat: 0
     })
 
+    this.anims.create({
+      key: "bananaFlash",
+      frames: this.anims.generateFrameNumbers("banana", {
+        start: 0,
+        end: 1
+      }),
+      frameRate: 6,
+      repeat: -1
+    })
+
     this.startCountdown()
     this.spawnWave()
+    this.scheduleNextBanana()
+  }
+
+  showIntroScreen() {
+    const width = this.scale.width
+    const height = this.scale.height
+
+    this.createBackground()
+
+    const introText = `B”H
+
+To my gorgeous Lexi,
+
+In honor of our 15th Anniversary, I built you a game.
+
+See how many hearts you can tap. My record is 56.
+
+With endless love from your adoring and nerdy (but cool) husband`
+
+    this.add.text(width / 2, height / 2 - 40, introText, {
+      fontSize: "18px",
+      color: "#ffffff",
+      fontFamily: "Arial",
+      align: "center",
+      wordWrap: { width: width - 60 }
+    }).setOrigin(0.5)
+
+    const startText = this.add.text(width / 2, height - 120, "Tap to Begin ❤️", {
+      fontSize: "22px",
+      color: "#ff8080",
+      fontStyle: "bold"
+    }).setOrigin(0.5)
+
+    this.tweens.add({
+      targets: startText,
+      scale: 1.08,
+      yoyo: true,
+      repeat: -1,
+      duration: 800,
+      ease: "Sine.easeInOut"
+    })
+
+    this.input.once("pointerdown", () => {
+      this.startGame()
+    })
+  }
+
+  startGame() {
+    this.scene.restart({ started: true })
   }
 
   createBackground() {
@@ -169,7 +176,6 @@ With endless love from your adoring and nerdy (but cool) husband`
   spawnHeart() {
     const width = this.scale.width
     const height = this.scale.height
-
     const padding = 80
     const maxAttempts = 80
 
@@ -216,12 +222,8 @@ With endless love from your adoring and nerdy (but cool) husband`
   handleTap(heart) {
     if (this.gameEnded) return
 
-    this.sound.play("pop", {
-      rate: Phaser.Math.FloatBetween(0.95, 1.08)
-    })
-
-
-
+    this.popSound.setRate(Phaser.Math.FloatBetween(0.92, 1.12))
+    this.popSound.play()
 
     heart.disableInteractive()
 
@@ -249,6 +251,81 @@ With endless love from your adoring and nerdy (but cool) husband`
     }
   }
 
+  // =========================
+  // BANANA POWER-UP
+  // =========================
+
+  scheduleNextBanana() {
+    const delayOptions = [6000, 12000, 18000]
+    const delay = Phaser.Utils.Array.GetRandom(delayOptions)
+
+    this.time.delayedCall(delay, () => {
+      if (!this.gameEnded) {
+        this.spawnBanana()
+      }
+    })
+  }
+
+  spawnBanana() {
+    const width = this.scale.width
+    const height = this.scale.height
+    const padding = 100
+    const maxAttempts = 80
+
+    let x, y
+    let valid = false
+    let attempts = 0
+
+    while (!valid && attempts < maxAttempts) {
+      x = Phaser.Math.Between(60, width - 60)
+      y = Phaser.Math.Between(150, height - 60)
+
+      valid = true
+
+      for (let heart of this.shapes) {
+        const dist = Phaser.Math.Distance.Between(x, y, heart.x, heart.y)
+        if (dist < padding) {
+          valid = false
+          break
+        }
+      }
+
+      attempts++
+    }
+
+    if (!valid) {
+      this.scheduleNextBanana()
+      return
+    }
+
+    this.banana = this.add.sprite(x, y, "banana", 0)
+    this.banana.setScale(2)
+    this.banana.play("bananaFlash")
+
+    this.banana.setInteractive({ useHandCursor: true })
+    this.banana.on("pointerdown", () => this.handleBananaTap())
+
+    this.time.delayedCall(2000, () => {
+      if (this.banana) {
+        this.banana.destroy()
+        this.banana = null
+        this.scheduleNextBanana()
+      }
+    })
+  }
+
+  handleBananaTap() {
+    if (!this.banana || this.gameEnded) return
+
+    this.score += 3
+    this.scoreText.setText(this.score)
+
+    this.banana.destroy()
+    this.banana = null
+
+    this.scheduleNextBanana()
+  }
+
   clearShapes() {
     for (let shape of this.shapes) {
       shape.destroy()
@@ -262,6 +339,11 @@ With endless love from your adoring and nerdy (but cool) husband`
 
     this.timerEvent.remove(false)
     this.clearShapes()
+
+    if (this.banana) {
+      this.banana.destroy()
+      this.banana = null
+    }
 
     const width = this.scale.width
     const height = this.scale.height
