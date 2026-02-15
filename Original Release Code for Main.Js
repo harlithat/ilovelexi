@@ -10,7 +10,6 @@ class GameScene extends Phaser.Scene {
       frameWidth: 40,
       frameHeight: 40
     })
-    this.load.audio("pop", "/assets/bubblepop.mp3")
   }
 
   create() {
@@ -216,7 +215,6 @@ With endless love from your adoring and nerdy (but cool) husband`
   handleTap(heart) {
     if (this.gameEnded) return
 
-    this.sound.play("pop")
     heart.disableInteractive()
 
     this.score++
