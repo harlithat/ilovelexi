@@ -216,7 +216,13 @@ With endless love from your adoring and nerdy (but cool) husband`
   handleTap(heart) {
     if (this.gameEnded) return
 
-    this.sound.play("pop")
+    this.sound.play("pop", {
+      rate: Phaser.Math.FloatBetween(0.95, 1.08)
+    })
+
+
+
+
     heart.disableInteractive()
 
     this.score++
